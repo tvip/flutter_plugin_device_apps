@@ -1,5 +1,6 @@
 package fr.g123k.deviceapps;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
@@ -7,6 +8,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
@@ -82,8 +84,9 @@ public class DeviceAppsPlugin implements
             case "getInstalledApps":
                 boolean systemApps = call.hasArgument("system_apps") && (Boolean) (call.argument("system_apps"));
                 boolean includeAppIcons = call.hasArgument("include_app_icons") && (Boolean) (call.argument("include_app_icons"));
+                boolean includeAppBanners = call.hasArgument("include_app_banners") && (Boolean) (call.argument("include_app_banners"));
                 boolean onlyAppsWithLaunchIntent = call.hasArgument("only_apps_with_launch_intent") && (Boolean) (call.argument("only_apps_with_launch_intent"));
-                fetchInstalledApps(systemApps, includeAppIcons, onlyAppsWithLaunchIntent, new InstalledAppsCallback() {
+                fetchInstalledApps(systemApps, includeAppIcons, includeAppBanners, onlyAppsWithLaunchIntent, new InstalledAppsCallback() {
                     @Override
                     public void onInstalledAppsListAvailable(final List<Map<String, Object>> apps) {
                         new Handler(Looper.getMainLooper()).post(new Runnable() {
@@ -101,7 +104,8 @@ public class DeviceAppsPlugin implements
                 } else {
                     String packageName = call.argument("package_name").toString();
                     boolean includeAppIcon = call.hasArgument("include_app_icon") && (Boolean) (call.argument("include_app_icon"));
-                    result.success(getApp(packageName, includeAppIcon));
+                    boolean includeAppBanner = call.hasArgument("include_app_banner") && (Boolean) (call.argument("include_app_banner"));
+                    result.success(getApp(packageName, includeAppIcon, includeAppBanner));
                 }
                 break;
             case "isAppInstalled":
@@ -141,12 +145,12 @@ public class DeviceAppsPlugin implements
         }
     }
 
-    private void fetchInstalledApps(final boolean includeSystemApps, final boolean includeAppIcons, final boolean onlyAppsWithLaunchIntent, final InstalledAppsCallback callback) {
+    private void fetchInstalledApps(final boolean includeSystemApps, final boolean includeAppIcons, final boolean includeAppBanners, final boolean onlyAppsWithLaunchIntent, final InstalledAppsCallback callback) {
         asyncWork.run(new Runnable() {
 
             @Override
             public void run() {
-                List<Map<String, Object>> installedApps = getInstalledApps(includeSystemApps, includeAppIcons, onlyAppsWithLaunchIntent);
+                List<Map<String, Object>> installedApps = getInstalledApps(includeSystemApps, includeAppIcons, includeAppBanners, onlyAppsWithLaunchIntent);
 
                 if (callback != null) {
                     callback.onInstalledAppsListAvailable(installedApps);
@@ -231,8 +235,10 @@ public class DeviceAppsPlugin implements
         }
     }
 
-    private Map<String, Object> getApp(String packageName, boolean includeAppIcon) {
+    private Map<String, Object> getApp(String packageName, boolean includeAppIcon, boolean includeAppBanner) {
         try {
+            PackageManager packageManager = activity.getPackageManager();
+            return getAppData(packageManager, packageManager.getPackageInfo(packageName, 0), includeAppIcon, includeAppBanner);
             PackageManager packageManager = context.getPackageManager();
             PackageInfo packageInfo = packageManager.getPackageInfo(packageName, 0);
 
@@ -245,6 +251,7 @@ public class DeviceAppsPlugin implements
         }
     }
 
+    private Map<String, Object> getAppData(PackageManager packageManager, PackageInfo pInfo, boolean includeAppIcon, boolean includeAppBanners) {
     private Map<String, Object> getAppData(PackageManager packageManager,
                                            PackageInfo pInfo,
                                            ApplicationInfo applicationInfo,
@@ -270,6 +277,17 @@ public class DeviceAppsPlugin implements
                 Drawable icon = packageManager.getApplicationIcon(pInfo.packageName);
                 String encodedImage = encodeToBase64(getBitmapFromDrawable(icon), Bitmap.CompressFormat.PNG, 100);
                 map.put(AppDataConstants.APP_ICON, encodedImage);
+            } catch (PackageManager.NameNotFoundException ignored) {
+            }
+        }
+
+        if (includeAppBanners && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT_WATCH) {
+            try {
+                Drawable banner = packageManager.getApplicationBanner(pInfo.packageName);
+                if (banner != null) {
+                    String image = encodeToBase64(getBitmapFromDrawable(banner), Bitmap.CompressFormat.PNG, 100);
+                    map.put("app_banner", image);
+                }
             } catch (PackageManager.NameNotFoundException ignored) {
             }
         }
