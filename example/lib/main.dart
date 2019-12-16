@@ -9,7 +9,7 @@ class ListAppsPages extends StatefulWidget {
 }
 
 class _ListAppsPagesState extends State<ListAppsPages> {
-  bool _showSystemApps = false;
+  bool _showSystemApps = true;
   bool _onlyLaunchableApps = false;
 
   @override
@@ -67,6 +67,7 @@ class _ListAppsPagesContent extends StatelessWidget {
     return FutureBuilder(
         future: DeviceApps.getInstalledApplications(
             includeAppIcons: true,
+            includeAppBanners: true,
             includeSystemApps: includeSystemApps,
             onlyAppsWithLaunchIntent: onlyAppsWithLaunchIntent),
         builder: (context, data) {
@@ -78,23 +79,28 @@ class _ListAppsPagesContent extends StatelessWidget {
             return ListView.builder(
                 itemBuilder: (context, position) {
                   Application app = apps[position];
-                  return Column(
+                  return Focus(
+                    autofocus: true,
+                    child: Column(
                     children: <Widget>[
-                      ListTile(
-                        leading: app is ApplicationWithIcon
-                            ? CircleAvatar(
-                                backgroundImage: MemoryImage(app.icon),
-                                backgroundColor: Colors.white,
-                              )
-                            : null,
-                        onTap: () => DeviceApps.openApp(app.packageName),
-                        title: Text("${app.appName} (${app.packageName})"),
-                        subtitle: Text('Version: ${app.versionName}\nSystem app: ${app.systemApp}\nAPK file path: ${app.apkFilePath}\nData dir : ${app.dataDir}\nInstalled: ${DateTime.fromMillisecondsSinceEpoch(app.installTimeMilis).toString()}\nUpdated: ${DateTime.fromMillisecondsSinceEpoch(app.updateTimeMilis).toString()}'),
-                      ),
-                      Divider(
-                        height: 1.0,
-                      )
-                    ],
+                        Container(
+                          child: ListTile(
+                            leading: app.banner != null ? CircleAvatar(
+                                            backgroundImage: MemoryImage(app.banner),
+                                            backgroundColor: Colors.grey,
+                                          )
+
+                                : null,
+                            onTap: () => DeviceApps.openApp(app.packageName),
+                            title: Text("${app.appName} (${app.packageName})"),
+                            subtitle: Text('Version: ${app.versionName}\nSystem app: ${app.systemApp}\nAPK file path: ${app.apkFilePath}\nData dir : ${app.dataDir}\nInstalled: ${DateTime.fromMillisecondsSinceEpoch(app.installTimeMilis).toString()}\nUpdated: ${DateTime.fromMillisecondsSinceEpoch(app.updateTimeMilis).toString()}'),
+                          ),
+                        ),
+                        Divider(
+                          height: 1.0,
+                        )
+                      ],
+                    ),
                   );
                 },
                 itemCount: apps.length);

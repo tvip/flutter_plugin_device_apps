@@ -1,6 +1,10 @@
 name: device_apps_example
 description: Demonstrates how to use the device_apps plugin.
 
+
+environment:
+  sdk: ">=2.2.2 <3.0.0"
+
 dependencies:
   flutter:
     sdk: flutter
