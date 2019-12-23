@@ -81,12 +81,17 @@ class DeviceApps {
     return isAppInstalled;
   }
 
-  static Future<bool> openApp(String packageName) async {
+  static Future<bool> openApp(String packageName, {String className}) async {
     if (packageName.isEmpty) {
       throw Exception('The package name can not be empty');
     }
-    return await _channel
-        .invokeMethod('openApp', {'package_name': packageName});
+    try {
+      return await _channel
+          .invokeMethod('openApp', <String, dynamic>{'package_name': packageName, 'class_name': className}).catchError(print);
+    } catch (e) {
+      print("Error: $e");
+      return false;
+    }
   }
 }
 
