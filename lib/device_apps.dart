@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:collection/collection.dart';
 
 import 'package:flutter/services.dart';
 
@@ -118,15 +119,6 @@ class Application {
 
   Application._fromMap(Map map)
       :
-//        assert(map['app_name'] != null),
-//        assert(map['apk_file_path'] != null),
-//        assert(map['package_name'] != null),
-//        assert(map['version_name'] != null),
-//        assert(map['version_code'] != null),
-//        assert(map['data_dir'] != null),
-//        assert(map['system_app'] != null),
-//        assert(map['install_time'] != null),
-//        assert(map['update_time'] != null),
         appName = map['app_name'],
         apkFilePath = map['apk_file_path'],
         packageName = map['package_name'],
@@ -138,6 +130,37 @@ class Application {
         banner = map['app_banner'],
         installTimeMilis = map['install_time'],
         updateTimeMilis = map['update_time'];
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+          other is Application &&
+              runtimeType == other.runtimeType &&
+              appName == other.appName &&
+              apkFilePath == other.apkFilePath &&
+              packageName == other.packageName &&
+              versionName == other.versionName &&
+              versionCode == other.versionCode &&
+              dataDir == other.dataDir &&
+              systemApp == other.systemApp &&
+              installTimeMilis == other.installTimeMilis &&
+              updateTimeMilis == other.updateTimeMilis &&
+              const ListEquality().equals(icon, other.icon) &&
+              const ListEquality().equals(banner, other.banner);
+
+  @override
+  int get hashCode =>
+      appName.hashCode ^
+      apkFilePath.hashCode ^
+      packageName.hashCode ^
+      versionName.hashCode ^
+      versionCode.hashCode ^
+      dataDir.hashCode ^
+      systemApp.hashCode ^
+      installTimeMilis.hashCode ^
+      updateTimeMilis.hashCode ^
+      const ListEquality().hash(icon) ^
+      const ListEquality().hash(banner);
 
   @override
   String toString() {
