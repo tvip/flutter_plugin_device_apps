@@ -121,7 +121,12 @@ public class DeviceAppsPlugin implements
                     result.error("ERROR", "Empty or null package name", null);
                 } else {
                     String packageName = call.argument("package_name").toString();
-                    result.success(openApp(packageName));
+                    Object classNameArg = call.argument("class_name");
+                    String className = null;
+                    if (classNameArg != null) {
+                        className = classNameArg.toString();
+                    }
+                    result.success(openApp(packageName, className));
                 }
                 break;
             case "openAppSettings":
@@ -188,19 +193,24 @@ public class DeviceAppsPlugin implements
         return installedApps;
     }
 
-    private boolean openApp(@NonNull String packageName) {
-        if (!isAppInstalled(packageName)) {
-            Log.w(LOG_TAG, "Application with package name \"" + packageName + "\" is not installed on this device");
-            return false;
+    private boolean openApp(String packageName, String className) {
+        Intent intent = null;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            intent = activity.getPackageManager().getLeanbackLaunchIntentForPackage(packageName);
         }
-
-        Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(packageName);
-
-        if (IntentUtils.isIntentOpenable(launchIntent, context)) {
-            context.startActivity(launchIntent);
+        if (intent == null) {
+            intent = activity.getPackageManager().getLaunchIntentForPackage(packageName);
+        }
+        if (intent != null) {
+            // null pointer check in case package name was not found
+            if (className != null) {
+                intent.setClassName(packageName, className);
+            }
+            System.out.println("start activity with packageName: " + packageName + ", and className: " + className);
+            activity.startActivity(intent);
             return true;
         }
-
+        System.out.println("Not found intent for packageName: " + packageName);
         return false;
     }
 
