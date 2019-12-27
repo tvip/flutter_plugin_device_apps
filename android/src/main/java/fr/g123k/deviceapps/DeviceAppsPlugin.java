@@ -35,18 +35,20 @@ public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewD
      */
     public static void registerWith(Registrar registrar) {
         final MethodChannel channel = new MethodChannel(registrar.messenger(), "g123k/device_apps");
-        DeviceAppsPlugin plugin = new DeviceAppsPlugin(registrar.activity());
+        DeviceAppsPlugin plugin = new DeviceAppsPlugin(registrar);
         registrar.addViewDestroyListener(plugin);
         channel.setMethodCallHandler(plugin);
     }
 
     private final int SYSTEM_APP_MASK = ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
 
+    private final Registrar registrar;
     private final Activity activity;
     private final AsyncWork asyncWork;
 
-    private DeviceAppsPlugin(Activity activity) {
-        this.activity = activity;
+    private DeviceAppsPlugin(Registrar registrar) {
+        this.registrar = registrar;
+        this.activity = registrar.activity();
         this.asyncWork = new AsyncWork();
     }
 
