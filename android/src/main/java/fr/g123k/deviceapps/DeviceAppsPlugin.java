@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
@@ -13,6 +14,7 @@ import android.text.TextUtils;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -155,6 +157,18 @@ public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewD
         }
         if (intent == null) {
             intent = activity.getPackageManager().getLaunchIntentForPackage(packageName);
+        }
+        if (intent == null) {
+            Intent intentOther = new Intent();
+            intentOther.setPackage(packageName);
+
+            PackageManager pm = activity.getPackageManager();
+            List<ResolveInfo> resolveInfoList = pm.queryIntentActivities(intentOther, 0);
+            Collections.sort(resolveInfoList, new ResolveInfo.DisplayNameComparator(pm));
+
+            if(resolveInfoList.size() > 0) {
+                intent = intentOther;
+            }
         }
         if (intent != null) {
             // null pointer check in case package name was not found
