@@ -1,53 +1,59 @@
 package fr.g123k.deviceapps;
 
-import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.text.TextUtils;
-import android.util.Base64;
+
+import androidx.annotation.NonNull;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.flutter.embedding.android.FlutterActivity;
+import io.flutter.embedding.engine.plugins.FlutterPlugin;
+import io.flutter.embedding.engine.plugins.activity.ActivityAware;
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry;
-import io.flutter.plugin.common.PluginRegistry.Registrar;
 import io.flutter.view.FlutterNativeView;
 
 /**
  * DeviceAppsPlugin
  */
-public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewDestroyListener {
+public class DeviceAppsPlugin implements FlutterPlugin, ActivityAware, MethodCallHandler, PluginRegistry.ViewDestroyListener {
+    private MethodChannel channel;
+    private FlutterActivity activity;
 
-    /**
-     * Plugin registration.
-     */
-    public static void registerWith(Registrar registrar) {
-        final MethodChannel channel = new MethodChannel(registrar.messenger(), "g123k/device_apps");
-        DeviceAppsPlugin plugin = new DeviceAppsPlugin(registrar.activity());
-        registrar.addViewDestroyListener(plugin);
-        channel.setMethodCallHandler(plugin);
+    @Override
+    public void onAttachedToEngine(@NonNull FlutterPlugin.FlutterPluginBinding flutterPluginBinding) {
+        channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), "g123k/device_apps");
+        channel.setMethodCallHandler(this);
+    }
+
+    @Override
+    public void onDetachedFromEngine(@NonNull FlutterPlugin.FlutterPluginBinding binding) {
+        channel.setMethodCallHandler(null);
     }
 
     private final int SYSTEM_APP_MASK = ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
 
-    private final Activity activity;
     private final AsyncWork asyncWork;
 
-    private DeviceAppsPlugin(Activity activity) {
-        this.activity = activity;
+    public DeviceAppsPlugin() {
         this.asyncWork = new AsyncWork();
     }
 
@@ -57,8 +63,9 @@ public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewD
             case "getInstalledApps":
                 boolean systemApps = call.hasArgument("system_apps") && (Boolean) (call.argument("system_apps"));
                 boolean includeAppIcons = call.hasArgument("include_app_icons") && (Boolean) (call.argument("include_app_icons"));
+                boolean includeAppBanners = call.hasArgument("include_app_banners") && (Boolean) (call.argument("include_app_banners"));
                 boolean onlyAppsWithLaunchIntent = call.hasArgument("only_apps_with_launch_intent") && (Boolean) (call.argument("only_apps_with_launch_intent"));
-                fetchInstalledApps(systemApps, includeAppIcons, onlyAppsWithLaunchIntent, new InstalledAppsCallback() {
+                fetchInstalledApps(systemApps, includeAppIcons, includeAppBanners, onlyAppsWithLaunchIntent, new InstalledAppsCallback() {
                     @Override
                     public void onInstalledAppsListAvailable(final List<Map<String, Object>> apps) {
                         if (!activity.isFinishing()) {
@@ -78,7 +85,8 @@ public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewD
                 } else {
                     String packageName = call.argument("package_name").toString();
                     boolean includeAppIcon = call.hasArgument("include_app_icon") && (Boolean) (call.argument("include_app_icon"));
-                    result.success(getApp(packageName, includeAppIcon));
+                    boolean includeAppBanner = call.hasArgument("include_app_banner") && (Boolean) (call.argument("include_app_banner"));
+                    result.success(getApp(packageName, includeAppIcon, includeAppBanner));
                 }
                 break;
             case "isAppInstalled":
@@ -94,7 +102,12 @@ public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewD
                     result.error("ERROR", "Empty or null package name", null);
                 } else {
                     String packageName = call.argument("package_name").toString();
-                    result.success(openApp(packageName));
+                    Object classNameArg = call.argument("class_name");
+                    String className = null;
+                    if (classNameArg != null) {
+                        className = classNameArg.toString();
+                    }
+                    result.success(openApp(packageName, className));
                 }
                 break;
             default:
@@ -102,12 +115,12 @@ public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewD
         }
     }
 
-    private void fetchInstalledApps(final boolean includeSystemApps, final boolean includeAppIcons, final boolean onlyAppsWithLaunchIntent, final InstalledAppsCallback callback) {
+    private void fetchInstalledApps(final boolean includeSystemApps, final boolean includeAppIcons, final boolean includeAppBanners, final boolean onlyAppsWithLaunchIntent, final InstalledAppsCallback callback) {
         asyncWork.run(new Runnable() {
 
             @Override
             public void run() {
-                List<Map<String, Object>> installedApps = getInstalledApps(includeSystemApps, includeAppIcons, onlyAppsWithLaunchIntent);
+                List<Map<String, Object>> installedApps = getInstalledApps(includeSystemApps, includeAppIcons, includeAppBanners, onlyAppsWithLaunchIntent);
 
                 if (callback != null) {
                     callback.onInstalledAppsListAvailable(installedApps);
@@ -117,7 +130,7 @@ public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewD
         });
     }
 
-    private List<Map<String, Object>> getInstalledApps(boolean includeSystemApps, boolean includeAppIcons, boolean onlyAppsWithLaunchIntent) {
+    private List<Map<String, Object>> getInstalledApps(boolean includeSystemApps, boolean includeAppIcons, boolean includeAppBanners, boolean onlyAppsWithLaunchIntent) {
         PackageManager packageManager = activity.getPackageManager();
         List<PackageInfo> apps = packageManager.getInstalledPackages(0);
         List<Map<String, Object>> installedApps = new ArrayList<>(apps.size());
@@ -126,24 +139,50 @@ public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewD
             if (!includeSystemApps && isSystemApp(pInfo)) {
                 continue;
             }
-            if (onlyAppsWithLaunchIntent && packageManager.getLaunchIntentForPackage(pInfo.packageName) == null) {
+            if (onlyAppsWithLaunchIntent
+                    && packageManager.getLaunchIntentForPackage(pInfo.packageName) == null
+                    && (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
+                    && packageManager.getLeanbackLaunchIntentForPackage(pInfo.packageName) == null)) {
                 continue;
             }
 
-            Map<String, Object> map = getAppData(packageManager, pInfo, includeAppIcons);
+            Map<String, Object> map = getAppData(packageManager, pInfo, includeAppIcons, includeAppBanners);
             installedApps.add(map);
         }
 
         return installedApps;
     }
 
-    private boolean openApp(String packageName) {
-        Intent launchIntent = activity.getPackageManager().getLaunchIntentForPackage(packageName);
-        if (launchIntent != null) {
+    private boolean openApp(String packageName, String className) {
+        Intent intent = null;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            intent = activity.getPackageManager().getLeanbackLaunchIntentForPackage(packageName);
+        }
+        if (intent == null) {
+            intent = activity.getPackageManager().getLaunchIntentForPackage(packageName);
+        }
+        if (intent == null) {
+            Intent intentOther = new Intent();
+            intentOther.setPackage(packageName);
+
+            PackageManager pm = activity.getPackageManager();
+            List<ResolveInfo> resolveInfoList = pm.queryIntentActivities(intentOther, 0);
+            Collections.sort(resolveInfoList, new ResolveInfo.DisplayNameComparator(pm));
+
+            if(resolveInfoList.size() > 0) {
+                intent = intentOther;
+            }
+        }
+        if (intent != null) {
             // null pointer check in case package name was not found
-            activity.startActivity(launchIntent);
+            if (className != null) {
+                intent.setClassName(packageName, className);
+            }
+            System.out.println("start activity with packageName: " + packageName + ", and className: " + className);
+            activity.startActivity(intent);
             return true;
         }
+        System.out.println("Not found intent for packageName: " + packageName);
         return false;
     }
 
@@ -160,16 +199,16 @@ public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewD
         }
     }
 
-    private Map<String, Object> getApp(String packageName, boolean includeAppIcon) {
+    private Map<String, Object> getApp(String packageName, boolean includeAppIcon, boolean includeAppBanner) {
         try {
             PackageManager packageManager = activity.getPackageManager();
-            return getAppData(packageManager, packageManager.getPackageInfo(packageName, 0), includeAppIcon);
+            return getAppData(packageManager, packageManager.getPackageInfo(packageName, 0), includeAppIcon, includeAppBanner);
         } catch (PackageManager.NameNotFoundException ignored) {
             return null;
         }
     }
 
-    private Map<String, Object> getAppData(PackageManager packageManager, PackageInfo pInfo, boolean includeAppIcon) {
+    private Map<String, Object> getAppData(PackageManager packageManager, PackageInfo pInfo, boolean includeAppIcon, boolean includeAppBanners) {
         Map<String, Object> map = new HashMap<>();
         map.put("app_name", pInfo.applicationInfo.loadLabel(packageManager).toString());
         map.put("apk_file_path", pInfo.applicationInfo.sourceDir);
@@ -184,8 +223,19 @@ public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewD
         if (includeAppIcon) {
             try {
                 Drawable icon = packageManager.getApplicationIcon(pInfo.packageName);
-                String encodedImage = encodeToBase64(getBitmapFromDrawable(icon), Bitmap.CompressFormat.PNG, 100);
-                map.put("app_icon", encodedImage);
+                byte[] image = convertToBytes(getBitmapFromDrawable(icon), Bitmap.CompressFormat.PNG, 100);
+                map.put("app_icon", image);
+            } catch (PackageManager.NameNotFoundException ignored) {
+            }
+        }
+
+        if (includeAppBanners && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT_WATCH) {
+            try {
+                Drawable banner = packageManager.getApplicationBanner(pInfo.packageName);
+                if (banner != null) {
+                    byte[] image = convertToBytes(getBitmapFromDrawable(banner), Bitmap.CompressFormat.PNG, 100);
+                    map.put("app_banner", image);
+                }
             } catch (PackageManager.NameNotFoundException ignored) {
             }
         }
@@ -193,10 +243,10 @@ public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewD
         return map;
     }
 
-    private String encodeToBase64(Bitmap image, Bitmap.CompressFormat compressFormat, int quality) {
+    private byte[] convertToBytes(Bitmap image, Bitmap.CompressFormat compressFormat, int quality) {
         ByteArrayOutputStream byteArrayOS = new ByteArrayOutputStream();
         image.compress(compressFormat, quality, byteArrayOS);
-        return Base64.encodeToString(byteArrayOS.toByteArray(), Base64.NO_WRAP);
+        return byteArrayOS.toByteArray();
     }
 
     private Bitmap getBitmapFromDrawable(Drawable drawable) {
@@ -211,5 +261,23 @@ public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewD
     public boolean onViewDestroy(FlutterNativeView flutterNativeView) {
         asyncWork.stop();
         return true;
+    }
+
+    @Override
+    public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
+        activity = (FlutterActivity) binding.getActivity();
+    }
+
+    @Override
+    public void onDetachedFromActivityForConfigChanges() {
+    }
+
+    @Override
+    public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding binding) {
+    }
+
+    @Override
+    public void onDetachedFromActivity() {
+        activity = null;
     }
 }
