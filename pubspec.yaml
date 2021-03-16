@@ -1,6 +1,6 @@
 name: device_apps
 description: Plugin to get the list of applications installed on the device (Android only)
-version: 1.0.9
+version: 1.1.0
 homepage: https://github.com/g123k/flutter_plugin_device_apps
 
 dependencies:
@@ -15,5 +15,5 @@ flutter:
         pluginClass: DeviceAppsPlugin
 
 environment:
-  sdk: ">=2.2.2 <3.0.0"
-  flutter: ">=1.10.0 <2.0.0"
+  sdk: ">=2.12.0 <3.0.0"
+  flutter: ">=2.0.0 <3.0.0"

@@ -1,6 +1,5 @@
 package fr.g123k.deviceapps;
 
-import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -12,6 +11,8 @@ import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.text.TextUtils;
 
+import androidx.annotation.NonNull;
+
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -19,38 +20,40 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.flutter.embedding.android.FlutterActivity;
+import io.flutter.embedding.engine.plugins.FlutterPlugin;
+import io.flutter.embedding.engine.plugins.activity.ActivityAware;
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry;
-import io.flutter.plugin.common.PluginRegistry.Registrar;
 import io.flutter.view.FlutterNativeView;
 
 /**
  * DeviceAppsPlugin
  */
-public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewDestroyListener {
+public class DeviceAppsPlugin implements FlutterPlugin, ActivityAware, MethodCallHandler, PluginRegistry.ViewDestroyListener {
+    private MethodChannel channel;
+    private FlutterActivity activity;
 
-    /**
-     * Plugin registration.
-     */
-    public static void registerWith(Registrar registrar) {
-        final MethodChannel channel = new MethodChannel(registrar.messenger(), "g123k/device_apps");
-        DeviceAppsPlugin plugin = new DeviceAppsPlugin(registrar);
-        registrar.addViewDestroyListener(plugin);
-        channel.setMethodCallHandler(plugin);
+    @Override
+    public void onAttachedToEngine(@NonNull FlutterPlugin.FlutterPluginBinding flutterPluginBinding) {
+        channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), "g123k/device_apps");
+        channel.setMethodCallHandler(this);
+    }
+
+    @Override
+    public void onDetachedFromEngine(@NonNull FlutterPlugin.FlutterPluginBinding binding) {
+        channel.setMethodCallHandler(null);
     }
 
     private final int SYSTEM_APP_MASK = ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
 
-    private final Registrar registrar;
-    private final Activity activity;
     private final AsyncWork asyncWork;
 
-    private DeviceAppsPlugin(Registrar registrar) {
-        this.registrar = registrar;
-        this.activity = registrar.activity();
+    public DeviceAppsPlugin() {
         this.asyncWork = new AsyncWork();
     }
 
@@ -258,5 +261,23 @@ public class DeviceAppsPlugin implements MethodCallHandler, PluginRegistry.ViewD
     public boolean onViewDestroy(FlutterNativeView flutterNativeView) {
         asyncWork.stop();
         return true;
+    }
+
+    @Override
+    public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
+        activity = (FlutterActivity) binding.getActivity();
+    }
+
+    @Override
+    public void onDetachedFromActivityForConfigChanges() {
+    }
+
+    @Override
+    public void onReattachedToActivityForConfigChanges(@NonNull ActivityPluginBinding binding) {
+    }
+
+    @Override
+    public void onDetachedFromActivity() {
+        activity = null;
     }
 }

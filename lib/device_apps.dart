@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:collection/collection.dart';
 
@@ -21,7 +20,7 @@ class DeviceApps {
       'only_apps_with_launch_intent': onlyAppsWithLaunchIntent
     }).then((apps) {
       if (apps != null && apps is List) {
-        List<Application> list = new List();
+        final list = <Application>[];
         for (var app in apps) {
           if (app is Map) {
             try {
@@ -39,15 +38,15 @@ class DeviceApps {
 
         return list;
       } else {
-        return List<Application>(0);
+        return <Application>[];
       }
     }).catchError((err) {
       print(err);
-      return List<Application>(0);
+      return <Application>[];
     });
   }
 
-  static Future<Application> getApp(String packageName,
+  static Future<Application?> getApp(String packageName,
       [
         bool includeAppIcon = false,
         bool includeAppBanner = false
@@ -82,7 +81,7 @@ class DeviceApps {
     return isAppInstalled;
   }
 
-  static Future<bool> openApp(String packageName, {String className}) async {
+  static Future<bool> openApp(String packageName, {String? className}) async {
     if (packageName.isEmpty) {
       throw Exception('The package name can not be empty');
     }
@@ -106,10 +105,10 @@ class Application {
   final bool systemApp;
   final int installTimeMilis;
   final int updateTimeMilis;
-  final Uint8List icon;
-  final Uint8List banner;
+  final Uint8List? icon;
+  final Uint8List? banner;
 
-  factory Application(Map map) {
+  factory Application(Map? map) {
     if (map == null || map.length == 0) {
       throw Exception('The map can not be null!');
     }

@@ -1,3 +1,7 @@
+## [1.1.0] - 16.03.2021
+
+* Null safety
+
 ## [1.0.9] - 13th December 2019
 
 * Add path to APK file (PR #16)
