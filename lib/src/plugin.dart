@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 
 import 'model/application_category.dart';
@@ -27,6 +25,7 @@ class DeviceApps {
   static Future<List<Application>> getInstalledApplications({
     bool includeSystemApps: false,
     bool includeAppIcons: false,
+    bool includeAppBanners: false,
     bool onlyAppsWithLaunchIntent: false,
   }) async {
     try {
@@ -34,6 +33,7 @@ class DeviceApps {
           await _methodChannel.invokeMethod('getInstalledApps', <String, bool>{
         'system_apps': includeSystemApps,
         'include_app_icons': includeAppIcons,
+        'include_app_banners': includeAppBanners,
         'only_apps_with_launch_intent': onlyAppsWithLaunchIntent
       });
 
@@ -219,15 +219,24 @@ class Application extends _BaseApplication {
   /// or disabled (installed, but not visible)
   final bool enabled;
 
+  final String? _icon;
+
+  final String? _banner;
+
+  Uint8List? get icon => hasIcon ? base64.decode(_icon!) : null;
+
+  bool get hasIcon => _icon != null;
+
+  Uint8List? get banner => hasBanner ? base64.decode(_banner!) : null;
+
+  bool get hasBanner => _banner != null;
+
   factory Application._(Map<dynamic, dynamic> map) {
     if (map.length == 0) {
       throw Exception('The map can not be null!');
     }
-    if (map.containsKey('app_icon')) {
-      return ApplicationWithIcon._fromMap(map);
-    } else {
-      return Application._fromMap(map);
-    }
+
+    return Application._fromMap(map);
   }
 
   Application._fromMap(Map<dynamic, dynamic> map)
@@ -241,6 +250,8 @@ class Application extends _BaseApplication {
         updateTimeMillis = map['update_time'] as int,
         enabled = map['is_enabled'] as bool,
         category = _parseCategory(map['category']),
+        _icon = map['app_icon'] as String?,
+        _banner = map['app_banner'] as String?,
         super._fromMap(map);
 
   /// Mapping of Android categories
@@ -323,50 +334,26 @@ class Application extends _BaseApplication {
           installTimeMillis == other.installTimeMillis &&
           updateTimeMillis == other.updateTimeMillis &&
           category == other.category &&
-          enabled == other.enabled;
+          enabled == other.enabled &&
+          _icon == other._icon &&
+          _banner == other._banner;
 
   @override
-  int get hashCode =>
-      appName.hashCode ^
-      apkFilePath.hashCode ^
-      packageName.hashCode ^
-      versionName.hashCode ^
-      versionCode.hashCode ^
-      dataDir.hashCode ^
-      systemApp.hashCode ^
-      installTimeMillis.hashCode ^
-      updateTimeMillis.hashCode ^
-      category.hashCode ^
-      enabled.hashCode;
-}
-
-/// If the [includeAppIcons] attribute is provided, this class will be used.
-/// To display an image simply use the [Image.memory] widget.
-/// Example:
-///
-/// ```
-/// Image.memory(app.icon)
-/// ```
-class ApplicationWithIcon extends Application {
-  final String _icon;
-
-  ApplicationWithIcon._fromMap(Map<dynamic, dynamic> map)
-      : _icon = map['app_icon'] as String,
-        super._fromMap(map);
-
-  /// Icon of the application to use in conjunction with [Image.memory]
-  Uint8List get icon => base64.decode(_icon);
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      super == other &&
-          other is ApplicationWithIcon &&
-          runtimeType == other.runtimeType &&
-          _icon == other._icon;
-
-  @override
-  int get hashCode => super.hashCode ^ _icon.hashCode;
+  int get hashCode => Object.hash(
+        appName,
+        apkFilePath,
+        packageName,
+        versionName,
+        versionCode,
+        dataDir,
+        systemApp,
+        installTimeMillis,
+        updateTimeMillis,
+        category,
+        enabled,
+        _icon,
+        _banner,
+      );
 }
 
 /// Represent an event relative to an application, which can be:

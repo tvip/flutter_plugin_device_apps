@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:device_apps/device_apps.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class AppsEventsScreen extends StatefulWidget {

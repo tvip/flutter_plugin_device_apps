@@ -80,9 +80,9 @@ class _AppsListScreenContent extends StatelessWidget {
                   return Column(
                     children: <Widget>[
                       ListTile(
-                        leading: app is ApplicationWithIcon
+                        leading: app.hasIcon
                             ? CircleAvatar(
-                                backgroundImage: MemoryImage(app.icon),
+                                backgroundImage: MemoryImage(app.icon!),
                                 backgroundColor: Colors.white,
                               )
                             : null,

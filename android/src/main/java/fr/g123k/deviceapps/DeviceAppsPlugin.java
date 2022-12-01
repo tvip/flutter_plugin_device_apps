@@ -167,7 +167,7 @@ public class DeviceAppsPlugin implements
         });
     }
 
-    private List<Map<String, Object>> getInstalledApps(boolean includeSystemApps, boolean includeAppIcons, boolean onlyAppsWithLaunchIntent) {
+    private List<Map<String, Object>> getInstalledApps(boolean includeSystemApps, boolean includeAppIcons, final boolean includeAppBanners, boolean onlyAppsWithLaunchIntent) {
         if (context == null) {
             Log.e(LOG_TAG, "Context is null");
             return new ArrayList<>(0);
@@ -188,7 +188,8 @@ public class DeviceAppsPlugin implements
             Map<String, Object> map = getAppData(packageManager,
                     packageInfo,
                     packageInfo.applicationInfo,
-                    includeAppIcons);
+                    includeAppIcons,
+                    includeAppBanners);
             installedApps.add(map);
         }
 
@@ -198,16 +199,16 @@ public class DeviceAppsPlugin implements
     private boolean openApp(String packageName, String className) {
         Intent intent = null;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-            intent = activity.getPackageManager().getLeanbackLaunchIntentForPackage(packageName);
+            intent = context.getPackageManager().getLeanbackLaunchIntentForPackage(packageName);
         }
         if (intent == null) {
-            intent = activity.getPackageManager().getLaunchIntentForPackage(packageName);
+            intent = context.getPackageManager().getLaunchIntentForPackage(packageName);
         }
         if (intent == null) {
             Intent intentOther = new Intent();
             intentOther.setPackage(packageName);
 
-            PackageManager pm = activity.getPackageManager();
+            PackageManager pm = context.getPackageManager();
             List<ResolveInfo> resolveInfoList = pm.queryIntentActivities(intentOther, 0);
             Collections.sort(resolveInfoList, new ResolveInfo.DisplayNameComparator(pm));
 
@@ -220,11 +221,11 @@ public class DeviceAppsPlugin implements
             if (className != null) {
                 intent.setClassName(packageName, className);
             }
-            System.out.println("start activity with packageName: " + packageName + ", and className: " + className);
-            activity.startActivity(intent);
+            Log.i(LOG_TAG, "start activity with packageName: " + packageName + ", and className: " + className);
+            context.startActivity(intent);
             return true;
         }
-        System.out.println("Not found intent for packageName: " + packageName);
+        Log.w(LOG_TAG, "Not found intent for packageName: " + packageName);
         return false;
     }
 
@@ -261,25 +262,24 @@ public class DeviceAppsPlugin implements
 
     private Map<String, Object> getApp(String packageName, boolean includeAppIcon, boolean includeAppBanner) {
         try {
-            PackageManager packageManager = activity.getPackageManager();
-            return getAppData(packageManager, packageManager.getPackageInfo(packageName, 0), includeAppIcon, includeAppBanner);
             PackageManager packageManager = context.getPackageManager();
             PackageInfo packageInfo = packageManager.getPackageInfo(packageName, 0);
 
             return getAppData(packageManager,
                     packageInfo,
                     packageInfo.applicationInfo,
-                    includeAppIcon);
+                    includeAppIcon,
+                    includeAppBanner);
         } catch (PackageManager.NameNotFoundException ignored) {
             return null;
         }
     }
 
-    private Map<String, Object> getAppData(PackageManager packageManager, PackageInfo pInfo, boolean includeAppIcon, boolean includeAppBanners) {
     private Map<String, Object> getAppData(PackageManager packageManager,
                                            PackageInfo pInfo,
                                            ApplicationInfo applicationInfo,
-                                           boolean includeAppIcon) {
+                                           boolean includeAppIcon,
+                                           boolean includeAppBanners) {
         Map<String, Object> map = new HashMap<>();
         map.put(AppDataConstants.APP_NAME, pInfo.applicationInfo.loadLabel(packageManager).toString());
         map.put(AppDataConstants.APK_FILE_PATH, applicationInfo.sourceDir);
@@ -310,7 +310,7 @@ public class DeviceAppsPlugin implements
                 Drawable banner = packageManager.getApplicationBanner(pInfo.packageName);
                 if (banner != null) {
                     String image = encodeToBase64(getBitmapFromDrawable(banner), Bitmap.CompressFormat.PNG, 100);
-                    map.put("app_banner", image);
+                    map.put(AppDataConstants.APP_BANNER, image);
                 }
             } catch (PackageManager.NameNotFoundException ignored) {
             }
@@ -377,7 +377,7 @@ public class DeviceAppsPlugin implements
     }
 
     Map<String, Object> getListenerData(String packageName, String event) {
-        Map<String, Object> data = getApp(packageName, false);
+        Map<String, Object> data = getApp(packageName, false, false);
 
         // The app is not installed
         if (data == null) {
