@@ -181,7 +181,9 @@ public class DeviceAppsPlugin implements
             if (!includeSystemApps && isSystemApp(packageInfo)) {
                 continue;
             }
-            if (onlyAppsWithLaunchIntent && packageManager.getLaunchIntentForPackage(packageInfo.packageName) == null) {
+            if (onlyAppsWithLaunchIntent
+                    && packageManager.getLaunchIntentForPackage(packageInfo.packageName) == null
+                    && (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP || packageManager.getLeanbackLaunchIntentForPackage(packageInfo.packageName) == null)) {
                 continue;
             }
 
